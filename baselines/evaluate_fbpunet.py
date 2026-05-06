@@ -73,4 +73,3 @@ psnr = PSNR(max_pixel=None)
 dinv.test(
     model, fbp_dataloader, physics, metrics=psnr, show_progress_bar=True, device=device
 )
-

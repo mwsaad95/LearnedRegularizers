@@ -71,7 +71,9 @@ def bilevel_training(
                 if diff_nu.max() < tol:
                     break
         ev_norm = (
-            torch.nn.functional.normalize(hvp, dim=[1, 2, 3], eps=eps).detach().contiguous()
+            torch.nn.functional.normalize(hvp, dim=[1, 2, 3], eps=eps)
+            .detach()
+            .contiguous()
         )
         hvp = torch.autograd.grad(grad, x, grad_outputs=ev_norm, create_graph=True)[0]
         norm_sq = torch.sum(hvp**2) / x.size(0)
