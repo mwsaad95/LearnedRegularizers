@@ -1,6 +1,6 @@
 # Learning Regularization Functionals: A Comparative Study
 
-This repository contains the implementations for the chapter [Learned Regularization Functionals for Inverse Problems: A Comparative Study](https://arxiv.org/abs/2510.01755). If you have any questions or remarks, feel free to open an issue.
+This repository contains the implementations for the chapter [Learned Regularization Functionals for Inverse Problems: A Comparative Study](https://doi.org/10.1016/bs.hna.2026.04.001). The results from the chapter are reproduced by [this commit](https://github.com/johertrich/LearnedRegularizers/tree/44ca6585c587b7d3a6606ba2bde10ccfa061de7d). We continue implementing improvements. If you have any questions or remarks, feel free to open an issue.
 
 This `readme` file is structured into
 
@@ -190,10 +190,13 @@ python eval_LPN.py --problem CT --dataset BSD
 ## 7. Citation
 
 ```
-@article{LearnedRegularizers,
+@incollection{LearnedRegularizers,
       title={Learning Regularization Functionals for Inverse Problems: A Comparative Study}, 
       author={Johannes Hertrich and Hok Shing Wong and Alexander Denker and Stanislas Ducotterd and Zhenghan Fang and Markus Haltmeier and Željko Kereta and Erich Kobler and Oscar Leong and Mohammad Sadegh Salehi and Carola-Bibiane Schönlieb and Johannes Schwab and Zakhar Shumaylov and Jeremias Sulam and German Shâma Wache and Martin Zach and Yasi Zhang and Matthias J. Ehrhardt and Sebastian Neumayer},
-      year={2025},
-      journal={arXiv preprint arXiv:2510.01755},
+      series = {Handbook of Numerical Analysis},
+      publisher = {Elsevier},
+      year = {2026},
+      issn = {1570-8659},
+      doi = {https://doi.org/10.1016/bs.hna.2026.04.001},
 }
 ```

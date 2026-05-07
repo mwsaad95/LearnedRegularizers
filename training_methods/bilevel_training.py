@@ -36,7 +36,6 @@ def bilevel_training(
     momentum_optim=None,  # defines the momentum parameters in the optimizer (None for using the defaults)
     reg=False,  # If reg is set to True, we apply Jacobian regularization
     reg_para=1e-5,  # regularization parameter for the Jacobian regularization
-    reg_reduced=False,  # If set to True, the Jacobian regularization is only applied to the regularizer and not to the forward operator (useful if the forward operator is expansive)
     adabelief=False,  # If True, we use Adabelief instead of Adam as an optimizer
     device="cuda" if torch.cuda.is_available() else "cpu",  # specifies the used device
     verbose=False,  # set True for a couple of debug prints during training
@@ -54,76 +53,29 @@ def bilevel_training(
         "best_regularizer_state will remain unchanged, and the returned model will be identical to the initial state."
     )
 
-    def hessian_vector_product(
-        x,
-        v,
-        data_fidelity,
-        y,
-        regularizer,
-        lmbd,
-        physics,
-        diff=False,
-        only_reg=False,
-    ):
-        x = x.requires_grad_(True)
-        if only_reg:
-            grad = lmbd * regularizer.grad(x)
-        else:
-            grad = data_fidelity.grad(x, y, physics) + lmbd * regularizer.grad(x)
-        dot = torch.dot(grad.view(-1), v.view(-1))
-        hvp = torch.autograd.grad(dot, x, create_graph=diff)[0]
-        if diff:
-            return hvp
-        return hvp.detach()
-
-    def jac_vector_product(x, v, data_fidelity, y, regularizer, lmbd, physics):
-        grad_lower_level = lambda x: data_fidelity.grad(
-            x, y, physics
-        ) + lmbd * regularizer.grad(x)
-        for param in regularizer.parameters():
-            if param.requires_grad:
-                dot = torch.dot(grad_lower_level(x).view(-1), v.view(-1))
-                if param.grad is None:
-                    param.grad = -torch.autograd.grad(dot, param, create_graph=False)[
-                        0
-                    ].detach()
-                else:
-                    param.grad -= torch.autograd.grad(dot, param, create_graph=False)[
-                        0
-                    ].detach()
-        return regularizer
-
     def jac_pow_loss(x, M=50, tol=1e-2):
-        hvp = torch.randint(low=0, high=1, size=x.shape).to(x) * 2 - 1
-        hvp_old = hvp.clone()
-        for i in range(M):
-            hvp = hessian_vector_product(
-                x,
-                hvp,
-                data_fidelity,
-                y,
-                regularizer,
-                lmbd,
-                physics,
-                diff=False,
-                only_reg=True,
-            ).detach()
-            hvp = torch.nn.functional.normalize(hvp, dim=[-2, -1], out=hvp)
-            if torch.norm(hvp - hvp_old) / x.size(0) < tol:
-                break
-            hvp_old = hvp.clone()
-        hvp = hvp.clone(memory_format=torch.contiguous_format).detach()
-        hvp = hessian_vector_product(
-            x,
-            hvp,
-            data_fidelity,
-            y,
-            regularizer,
-            lmbd,
-            physics,
-            diff=True,
-            only_reg=True,
+        eps = 1e-5
+        x = x.requires_grad_(True)
+        grad = regularizer.grad(x)
+        with torch.no_grad():
+            hvp = torch.randn_like(x)
+            nu = torch.zeros(x.size(0), 1, 1, 1, device=x.device)
+            for _ in range(M):
+                nu_old = nu.clone()
+                ev_norm = torch.nn.functional.normalize(hvp, dim=[1, 2, 3], eps=eps)
+                hvp = torch.autograd.grad(
+                    grad, x, grad_outputs=ev_norm, retain_graph=True, create_graph=False
+                )[0]
+                nu = (hvp * ev_norm).sum(dim=[1, 2, 3], keepdim=True)
+                diff_nu = (nu.abs() - nu_old.abs()).abs() / nu.abs().clamp_min(eps)
+                if diff_nu.max() < tol:
+                    break
+        ev_norm = (
+            torch.nn.functional.normalize(hvp, dim=[1, 2, 3], eps=eps)
+            .detach()
+            .contiguous()
         )
+        hvp = torch.autograd.grad(grad, x, grad_outputs=ev_norm, create_graph=True)[0]
         norm_sq = torch.sum(hvp**2) / x.size(0)
         print(f"Jac_Loss: {norm_sq}")
         if logger is not None:
@@ -220,24 +172,34 @@ def bilevel_training(
                     loss_fn(x_recon), x_recon, create_graph=False
                 )[0].detach()
 
-                q = minres(
-                    lambda input: hessian_vector_product(
-                        x_recon.detach(),
-                        input,
-                        data_fidelity,
-                        y,
-                        regularizer,
-                        lmbd,
-                        physics,
-                    ),
-                    grad_loss,
-                    max_iter=minres_max_iter,
-                    tol=minres_tol,
-                )
+                inner_grad = data_fidelity.grad(
+                    x_recon, y, physics
+                ) + lmbd * regularizer.grad(x_recon)
 
-                regularizer = jac_vector_product(
-                    x_recon, q, data_fidelity, y, regularizer, lmbd, physics
+                def hvp_fn(v):
+                    return torch.autograd.grad(
+                        inner_grad,
+                        x_recon,
+                        grad_outputs=v,
+                        retain_graph=True,
+                    )[0]
+
+                q = minres(hvp_fn, grad_loss, max_iter=minres_max_iter, tol=minres_tol)
+
+                params = [p for p in regularizer.parameters() if p.requires_grad]
+                hypergrads = torch.autograd.grad(
+                    outputs=inner_grad,
+                    inputs=params,
+                    grad_outputs=q,
+                    retain_graph=False,  # Finally release the graph memory here
                 )
+                with torch.no_grad():
+                    for p, hg in zip(params, hypergrads):
+                        if p.grad is None:
+                            p.grad = -hg.detach()
+                        else:
+                            p.grad -= hg.detach()
+
             elif mode == "JFB":
                 L = x_stats["L"]
                 grad = data_fidelity.grad(
