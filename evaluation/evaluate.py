@@ -8,6 +8,8 @@ The input arguments of the evaluate functions are specified as comments in the f
 import numpy as np
 from torch.utils.data import DataLoader
 from .nmAPG import reconstruct_nmAPG
+from .lbfgs import reconstruct_lbfgs
+from .newton_cg import reconstruct_newton_cg
 from .adam import reconstruct_adam
 import torch
 from deepinv.loss.metric import PSNR
@@ -18,6 +20,10 @@ import os
 from PIL import Image
 import time
 
+# ==========================================
+# Algorithm selection switch (Options: "nmAPG", "lbfgs", "newton_cg")
+CURRENT_ALGO = "lbfgs"  
+# ==========================================
 
 def evaluate(
     physics,  # deepinv physics object defining forward operator and noise model
@@ -62,7 +68,8 @@ def evaluate(
         y = physics(x)
 
         t_start = time.time()
-        if adam:
+        
+        if CURRENT_ALGO == "adam":
             recon, stats = reconstruct_adam(
                 y,
                 physics,
@@ -76,6 +83,35 @@ def evaluate(
                 return_stats=True,
             )
             stats["L"] = torch.tensor(0.0, dtype=torch.float, device=device)
+        
+        elif CURRENT_ALGO == "lbfgs":
+            recon, stats = reconstruct_lbfgs(
+                y,
+                physics,
+                data_fidelity,
+                regularizer,
+                lmbd,
+                max_iter,
+                tol,
+                return_stats=True,
+                verbose=False,
+            )
+            stats["L"] = torch.tensor(0.0, dtype=torch.float, device=device)
+
+        elif CURRENT_ALGO == "newton_cg":
+            recon, stats = reconstruct_newton_cg(
+                y,
+                physics,
+                data_fidelity,
+                regularizer,
+                lmbd,
+                max_iter,
+                tol,
+                return_stats=True,
+                verbose=False,
+            )
+            stats["L"] = torch.tensor(0.0, dtype=torch.float, device=device)
+
         else:
             recon, stats = reconstruct_nmAPG(
                 y,

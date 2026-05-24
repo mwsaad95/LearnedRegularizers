@@ -26,9 +26,7 @@ def nmAPG(
     y: torch.Tensor,  # additional parameter y of the objective function
     f: Callable[[torch.Tensor], torch.Tensor],  # objective function
     nabla: Callable[[torch.Tensor], torch.Tensor],  # gradient of the objective function
-    f_and_nabla: Callable[
-        [torch.Tensor], [torch.Tensor]
-    ],  # callble which returns both, objective function and its gradient
+    f_and_nabla: Callable[[torch.Tensor], torch.Tensor],  # callble which returns both, objective function and its gradient
     max_iter: int = 200,  # maximal number of iterations
     L_init: float = 1,  # initial guess of the local Lipschitz constant of the gradient (used in the line search)
     tol: float = 1e-4,  # tolerance for the stopping criterion (relative residual between two iterates)
