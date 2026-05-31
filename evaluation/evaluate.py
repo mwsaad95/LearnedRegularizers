@@ -20,11 +20,6 @@ import os
 from PIL import Image
 import time
 
-# ==========================================
-# Algorithm selection switch (Options: "nmAPG", "lbfgs", "newton_cg")
-CURRENT_ALGO = "lbfgs"  
-# ==========================================
-
 def evaluate(
     physics,  # deepinv physics object defining forward operator and noise model
     data_fidelity,  # deepinv data fidelity object defining the data fidelity term of the variational problem
@@ -41,6 +36,7 @@ def evaluate(
     verbose=False,  # set to True to print some stats (e.g. number of iterations used in the solver)
     save_path=None,  # specify a path to save the images (ground truth, measurements and reconstruction)
     logger=None,  # specify a Python logging logger to write a log file (e.g. with the PSNRs of the single images in the dataset)
+    eval_algo="nmAPG",  # specify the algorithm to use for evaluation (options: "nmAPG", "lbfgs", "newton_cg")
 ):
 
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
@@ -69,7 +65,7 @@ def evaluate(
 
         t_start = time.time()
         
-        if CURRENT_ALGO == "adam":
+        if eval_algo == "adam":
             recon, stats = reconstruct_adam(
                 y,
                 physics,
@@ -83,8 +79,8 @@ def evaluate(
                 return_stats=True,
             )
             stats["L"] = torch.tensor(0.0, dtype=torch.float, device=device)
-        
-        elif CURRENT_ALGO == "lbfgs":
+
+        elif eval_algo == "lbfgs":
             recon, stats = reconstruct_lbfgs(
                 y,
                 physics,
@@ -93,12 +89,13 @@ def evaluate(
                 lmbd,
                 max_iter,
                 tol,
-                return_stats=True,
+                x_init=None,
+                detach_grads=True,
                 verbose=False,
+                return_stats=True,
             )
-            stats["L"] = torch.tensor(0.0, dtype=torch.float, device=device)
 
-        elif CURRENT_ALGO == "newton_cg":
+        elif eval_algo == "newton_cg":
             recon, stats = reconstruct_newton_cg(
                 y,
                 physics,
@@ -107,10 +104,11 @@ def evaluate(
                 lmbd,
                 max_iter,
                 tol,
-                return_stats=True,
+                x_init=None,
+                detach_grads=True,
                 verbose=False,
+                return_stats=True,
             )
-            stats["L"] = torch.tensor(0.0, dtype=torch.float, device=device)
 
         else:
             recon, stats = reconstruct_nmAPG(
