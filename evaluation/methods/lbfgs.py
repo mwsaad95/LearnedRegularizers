@@ -2,6 +2,7 @@
 from collections import deque
 import torch
 from .line_search import strong_wolfe, weak_wolfe
+import matplotlib.pyplot as plt
 
 
 @torch.no_grad()
@@ -56,6 +57,11 @@ def lbfgs(
     t = min(1.0, 1.0 / g.abs().sum())
     n_iter = 0
     converged = False
+
+    # 1. Initialize empty lists to store historical metrics
+    f_history = []
+    grad_norm_history = []
+    rel_step_history = []
 
     for n_iter in range(1, max_iter + 1):
 
@@ -117,6 +123,11 @@ def lbfgs(
         g = g_new
         t = 1.0
 
+        # 2. Append values into history tracking lists at the end of each iteration
+        f_history.append(f.item() if hasattr(f, 'item') else f)
+        grad_norm_history.append(g.norm().item())
+        rel_step_history.append((s.norm() / x.norm().clamp(min=1e-12)).item())
+
         if s.norm() / x.norm().clamp(min=1e-12) <= tol:
             converged = True
             break
@@ -138,4 +149,43 @@ def lbfgs(
         print("Current function value: %f" % f)
         print("Iterations: %d" % n_iter)
         print("Function evaluations: %d" % nfev)
+
+    # =======================================================
+    # 3. Direct Plotting Code: Generate and save individual 2D plots
+    # =======================================================
+    
+    # Plot 1: Objective Function Value History (Just F)
+    plt.figure(figsize=(7, 5))
+    plt.plot(f_history, color='blue', linewidth=2, label='Function Value (F)')
+    plt.xlabel('Iterations (iter.)')
+    plt.ylabel('Function Value (F)')
+    plt.title('Convergence History - Function Value')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig('plot_1_function_value.png', dpi=300)
+    plt.close()
+
+    # Plot 2: Gradient Norm History (||∇F||)
+    plt.figure(figsize=(7, 5))
+    plt.plot(grad_norm_history, color='cyan', linestyle='--', linewidth=2, label='Gradient Norm ||∇F||')
+    plt.xlabel('Iterations (iter.)')
+    plt.ylabel('Gradient Norm ||∇F||')
+    plt.title('Convergence History - Gradient Norm')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig('plot_2_gradient_norm.png', dpi=300)
+    plt.close()
+
+    # Plot 3: Relative Step Size vs Tolerance Threshold Line
+    plt.figure(figsize=(7, 5))
+    plt.plot(rel_step_history, color='darkblue', linewidth=2, label='Relative Step Size')
+    plt.axhline(y=tol, color='red', linestyle=':', label=f'Tolerance (tol={tol})')
+    plt.xlabel('Iterations (iter.)')
+    plt.ylabel('||x_k - x_{k-1}|| / ||x_k||')
+    plt.title('Relative Step Size vs Tolerance')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('plot_3_relative_step_size.png', dpi=300)
+    plt.close()
+    
     return x.view_as(x0), n_iter, converged

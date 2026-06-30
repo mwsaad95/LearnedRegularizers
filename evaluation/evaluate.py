@@ -145,7 +145,7 @@ def evaluate(
         psnrs.append(psnr(recon, x).squeeze().item())
         if logger is not None:
             logger.info(f"Image {i} reconstructed, PSNR: {psnrs[-1]:.2f}")
-        if save_path is not None and (i < 10):
+        if save_path is not None:
             save_image(x, os.path.join(save_path, f"ground_truth_{i}.png"), padding=0)
             save_image(y, os.path.join(save_path, f"measurement_{i}.png"), padding=0)
             save_image(
