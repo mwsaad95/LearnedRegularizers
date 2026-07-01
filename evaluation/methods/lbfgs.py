@@ -180,6 +180,7 @@ def lbfgs(
     plt.figure(figsize=(7, 5))
     plt.plot(rel_step_history, color='darkblue', linewidth=2, label='Relative Step Size')
     plt.axhline(y=tol, color='red', linestyle=':', label=f'Tolerance (tol={tol})')
+    plt.yscale('log')
     plt.xlabel('Iterations (iter.)')
     plt.ylabel('||x_k - x_{k-1}|| / ||x_k||')
     plt.title('Relative Step Size vs Tolerance')
