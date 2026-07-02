@@ -3,6 +3,49 @@ from collections import deque
 import torch
 from .line_search import strong_wolfe, weak_wolfe
 import matplotlib.pyplot as plt
+import time
+import datetime
+import sys
+
+# =========================================================================
+# RUNTIME EVALUATION LOGGER SYSTEM
+# =========================================================================
+def _get_cli_arg(flag, default):
+    """Safely extracts execution arguments from the runtime system command."""
+    for i, arg in enumerate(sys.argv):
+        if arg == flag and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        if arg.startswith(f"{flag}="):
+            return arg.split("=")[1]
+    return default
+
+_prob = _get_cli_arg("--problem", "Denoising")
+_reg = _get_cli_arg("--regularizer_name", "CRR")
+_mode = _get_cli_arg("--evaluation_mode", "IFT")
+
+# Define the global log filename using the system's exact string timestamp format
+_global_log_filename = f"log_eval_lbfgs_{_prob}_{_reg}_{_mode}_" + str(datetime.datetime.now()) + ".log"
+_image_counter = 0  
+
+class _StdoutMetricsHook:
+    """Monitors standard output to extract evaluation metrics and dataset statistics."""
+    def __init__(self, target_stream):
+        self.target_stream = target_stream
+    def write(self, text):
+        self.target_stream.write(text)
+        # Capture progression statistics and final evaluation output metrics
+        keywords = ["PSNR", "iterations over the test set", "reconstruction time"]
+        if any(key in text for key in keywords):
+            clean_output = text.replace('\r', '\n').strip()
+            if clean_output:
+                with open(_global_log_filename, mode="a", encoding="utf-8") as f_log:
+                    f_log.write(f"\n[Evaluation Summary] {clean_output}\n")
+    def flush(self):
+        self.target_stream.flush()
+
+# Redirect the output stream to capture performance data systematically
+sys.stdout = _StdoutMetricsHook(sys.stdout)
+# =========================================================================
 
 
 @torch.no_grad()
@@ -11,7 +54,7 @@ def lbfgs(
     x0,
     history_size=10,
     max_iter=200,
-    tol=1e-4,
+    tol=1e-6,
     gtol=1e-5,
     gtd_tol=1e-10,
     verbose=False,
@@ -23,6 +66,10 @@ def lbfgs(
     damping_eps=None,
 ):
     """L-BFGS minimizer (Nocedal & Wright §7.4). See ``reconstruct`` for parameter docs."""
+    global _image_counter
+    _image_counter += 1  
+    start_time = time.time()
+
     if damping_eps is None:
         damping_eps = None if line_search_variant == "strong" else 0.2
 
@@ -49,6 +96,13 @@ def lbfgs(
     g_norm_0 = g.norm().clamp(min=1e-12)
     if verbose:
         print("initial fval: %0.4f" % f)
+
+    # Write structural tracking headers for the current batch optimization session
+    with open(_global_log_filename, mode="a", encoding="utf-8") as f_log:
+        f_log.write(f"\n" + "="*50 + "\n")
+        f_log.write(f"OPTIMIZATION FOR IMAGE #{_image_counter}/68\n")
+        f_log.write(f"==> Initial Function Value: {f.item():.4f}\n")
+        f_log.write("="*50 + "\n")
 
     # Inverse-Hessian state for the L-BFGS two-loop recursion.
     history = deque(maxlen=history_size)
@@ -128,6 +182,14 @@ def lbfgs(
         grad_norm_history.append(g.norm().item())
         rel_step_history.append((s.norm() / x.norm().clamp(min=1e-12)).item())
 
+        # Write clean iteration telemetry logs straight from tracking arrays
+        with open(_global_log_filename, mode="a", encoding="utf-8") as f_log:
+            f_log.write(
+                f"Iter: {n_iter:03d} | Time: {time.time() - start_time:.2f}s | "
+                f"F-val: {f_history[-1]:.6f} | Grad-Norm: {grad_norm_history[-1]:.6f} | "
+                f"Rel-Step: {rel_step_history[-1]:.6f}\n"
+            )
+
         if s.norm() / x.norm().clamp(min=1e-12) <= tol:
             converged = True
             break
@@ -149,6 +211,13 @@ def lbfgs(
         print("Current function value: %f" % f)
         print("Iterations: %d" % n_iter)
         print("Function evaluations: %d" % nfev)
+
+    # Record objective runtime parameters directly at session completion
+    with open(_global_log_filename, mode="a", encoding="utf-8") as f_log:
+        f_log.write(
+            f"--> Image #{_image_counter}/68 Finished. "
+            f"Total Iters: {n_iter} | Total Time: {time.time() - start_time:.2f}s | Total FEvals: {nfev} | Converged: {converged}\n"        
+            )
 
     # =======================================================
     # 3. Direct Plotting Code: Generate and save individual 2D plots
@@ -183,7 +252,7 @@ def lbfgs(
     plt.yscale('log')
     plt.xlabel('Iterations (iter.)')
     plt.ylabel('||x_k - x_{k-1}|| / ||x_k||')
-    plt.title('Relative Step Size vs Tolerance')
+    plt.title('Relative Step Size vs Iterations')
     plt.legend()
     plt.grid(True)
     plt.savefig('plot_3_relative_step_size.png', dpi=300)
