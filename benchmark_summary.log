@@ -1,0 +1,31 @@
+2026-07-05 23:20:25.684928
+--- Method: l-bfgs | CRR with IFT on Denoising | Tol: 1e-06 ---
+Mean PSNR over the test set: 28.01
+Mean iterations over the test set: 47.35
+Mean reconstruction time over the test set: 0.71 seconds
+
+2026-07-05 23:21:34.021623
+--- Method: l-bfgs | WCRR with IFT on Denoising | Tol: 1e-06 ---
+Mean PSNR over the test set: 28.61
+Mean iterations over the test set: 49.88
+Mean reconstruction time over the test set: 0.72 seconds
+
+2026-07-05 23:24:30.934784
+--- Method: l-bfgs | TDV with IFT on Denoising | Tol: 1e-06 ---
+Mean PSNR over the test set: 29.25
+Mean iterations over the test set: 73.78
+Mean reconstruction time over the test set: 1.64 seconds
+
+2026-07-05 23:28:31.813478
+--- Method: l-bfgs | LSR with IFT on Denoising | Tol: 1e-06 ---
+Mean PSNR over the test set: 29.26
+Mean iterations over the test set: 55.03
+Mean reconstruction time over the test set: 1.59 seconds
+
+2026-07-05 23:32:06.161005
+--- Method: nmapg | CRR with IFT on Denoising | Tol: 1e-06 ---
+Mean PSNR over the test set: 28.02
+Mean iterations over the test set: 116.97
+Mean reconstruction time over the test set: 1.73 seconds
+Mean L over the test set: 2379.06
+

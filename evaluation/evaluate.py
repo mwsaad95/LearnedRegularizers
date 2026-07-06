@@ -19,6 +19,7 @@ from tqdm import tqdm
 from torchvision.utils import save_image
 import os
 import time
+import datetime
 
 
 def evaluate(
@@ -26,6 +27,9 @@ def evaluate(
     data_fidelity,
     dataset,
     regularizer,
+    regularizer_name,
+    evaluation_mode,
+    problem,
     lmbd,
     step_size,
     max_iter,
@@ -145,7 +149,7 @@ def evaluate(
         psnrs.append(psnr(recon, x).squeeze().item())
         if logger is not None:
             logger.info(f"Image {i} reconstructed, PSNR: {psnrs[-1]:.2f}")
-        if save_path is not None:
+        if save_path is not None and (i < 10):
             save_image(x, os.path.join(save_path, f"ground_truth_{i}.png"), padding=0)
             save_image(y, os.path.join(save_path, f"measurement_{i}.png"), padding=0)
             save_image(
@@ -173,4 +177,14 @@ def evaluate(
         print(line)
         if logger is not None:
             logger.info(line)
+            
+    # Write/Append summary statistics
+    summary_log_path = "benchmark_summary.log"
+    with open(summary_log_path, "a") as f_log:
+        f_log.write(f"{datetime.datetime.now()}\n")
+        f_log.write(f"--- Method: {method} | {regularizer_name} with {evaluation_mode} on {problem} | Tol: {tol} ---\n")
+        for line in lines:
+            f_log.write(line + "\n")
+        f_log.write("\n")
+
     return mean_psnr, x_out, y_out, recon_out
